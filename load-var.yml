@@ -1,0 +1,59 @@
+resources:
+- name: testing
+  type: git
+  source: 
+    uri: https://github.com/Raj-Sparta-Sky/testing.git
+    branch: main 
+
+var_sources:
+- name: vars
+  type: dummy
+  config:
+    vars:
+      base_username2: concourse1
+
+jobs:
+- name: vars-bug
+  plan:
+    - task: secrets-mock
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: alpine
+        run:
+          path: sh
+          args:
+          - -xce
+          - |
+            echo '002' > secrets/concourse1
+            echo 'password' > secrets/concourse1-002
+        outputs:
+        - name: secrets
+
+    - load_var: username2
+      file: secrets/((vars:base_username2))
+      format: trim
+
+    - task: debug-creds
+      config:
+        platform: linux
+        image_resource:
+          type: registry-image
+          source:
+            repository: alpine
+        inputs:
+        - name: secrets
+        run:
+          path: sh
+          args:
+          - -xce
+          - |
+            echo ((vars:base_username2))  # should be concourse1, this is the correct syntax and its getting interpolated here
+            echo ((.:username2)) # should be 002
+    
+    - put: testing
+      no_get: true
+      params:
+        branch: main 
